@@ -1,0 +1,1022 @@
+﻿<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>三合一命理星盤系統｜八字・紫微斗數・西洋占星</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lunar-javascript@1.6.12/lunar.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
+  <style>
+    body {
+      background-color: #0f172a;
+      color: #e2e8f0;
+      font-family: "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+    }
+    .wx-木 { color: #4ade80; }
+    .wx-火 { color: #f87171; }
+    .wx-土 { color: #fbbf24; }
+    .wx-金 { color: #fde047; }
+    .wx-水 { color: #60a5fa; }
+    .bg-wx-木 { background-color: #22c55e; }
+    .bg-wx-火 { background-color: #ef4444; }
+    .bg-wx-土 { background-color: #d97706; }
+    .bg-wx-金 { background-color: #eab308; }
+    .bg-wx-水 { background-color: #3b82f6; }
+
+
+    .zw-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-rows: repeat(4, minmax(165px, auto));
+      gap: 6px;
+    }
+    .zw-center {
+      grid-column: 2 / 4;
+      grid-row: 2 / 4;
+    }
+    .sihua-祿 { background: #16a34a; color: #fff; }
+    .sihua-權 { background: #dc2626; color: #fff; }
+    .sihua-科 { background: #2563eb; color: #fff; }
+    .sihua-忌 { background: #9333ea; color: #fff; }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-6">
+
+
+  <div class="max-w-7xl mx-auto space-y-5">
+    <!-- 頂部標題與輸入控制面板 -->
+    <header class="bg-slate-800/90 border border-slate-700 rounded-2xl p-4 shadow-xl">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 border-b border-slate-700 pb-3">
+        <div>
+          <h1 class="text-2xl font-bold bg-gradient-to-r from-amber-300 via-indigo-300 to-sky-300 bg-clip-text text-transparent">
+            三合一中西命理排盤系統
+          </h1>
+          <p class="text-xs text-slate-400 mt-0.5">
+            單檔整合：四柱八字（含節氣藏干大運）・紫微斗數（十二宮四化安星）・西洋本命星盤（SVG 宮位與三角相位矩陣）
+          </p>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="switchTab('bazi')" id="tab-bazi" class="px-4 py-2 rounded-lg text-sm font-semibold bg-amber-500 text-slate-950 transition">
+            八字命盤
+          </button>
+          <button onclick="switchTab('ziwei')" id="tab-ziwei" class="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-700 text-slate-200 hover:bg-slate-600 transition">
+            紫微斗數
+          </button>
+          <button onclick="switchTab('astro')" id="tab-astro" class="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-700 text-slate-200 hover:bg-slate-600 transition">
+            西洋星盤
+          </button>
+        </div>
+      </div>
+
+
+      <!-- 出生資料表單 -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 items-end">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">西元出生日期</label>
+          <input type="date" id="inp-date" value="1995-08-16" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400" />
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">出生時間</label>
+          <input type="time" id="inp-time" value="14:30" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400" />
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">性別（大運/大限順逆）</label>
+          <select id="inp-gender" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400">
+            <option value="1">男（乾造 / 陽男陰男）</option>
+            <option value="0">女（坤造 / 陽女陰女）</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">預設城市（經緯度）</label>
+          <select id="inp-city" onchange="onCityChange()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400">
+            <option value="25.0330,121.5654,8">台北 (121.56°E, 25.03°N)</option>
+            <option value="22.3193,114.1694,8" selected>香港 (114.17°E, 22.32°N)</option>
+            <option value="39.9042,116.4074,8">北京 (116.41°E, 39.90°N)</option>
+            <option value="31.2304,121.4737,8">上海 (121.47°E, 31.23°N)</option>
+            <option value="35.6762,139.6503,9">東京 (139.65°E, 35.68°N)</option>
+            <option value="51.5074,-0.1278,0">倫敦 (0.13°W, 51.51°N)</option>
+            <option value="40.7128,-74.0060,-5">紐約 (74.01°W, 40.71°N)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">緯度 / 經度</label>
+          <div class="flex gap-1">
+            <input type="number" step="0.01" id="inp-lat" value="22.32" title="緯度" class="w-1/2 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white" />
+            <input type="number" step="0.01" id="inp-lng" value="114.17" title="經度" class="w-1/2 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">時區 (UTC)</label>
+          <input type="number" step="0.5" id="inp-tz" value="8" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white" />
+        </div>
+        <div>
+          <button onclick="calculateAll()" class="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold py-1.5 px-4 rounded-lg shadow-lg transition">
+            立即排盤
+          </button>
+        </div>
+      </div>
+
+
+      <!-- 農曆與節氣摘要列 -->
+      <div id="summary-bar" class="mt-3 pt-2.5 border-t border-slate-700/70 text-xs text-slate-300 flex flex-wrap gap-x-6 gap-y-1"></div>
+    </header>
+
+
+    <!-- ==================== 1. 八字命盤面板 ==================== -->
+    <section id="panel-bazi" class="space-y-5">
+      <div class="bg-slate-800/90 border border-slate-700 rounded-2xl p-5 shadow-xl">
+        <h2 class="text-lg font-bold text-amber-400 mb-4 flex items-center gap-2">
+          <span>四柱八字命盤</span>
+          <span class="text-xs font-normal text-slate-400">（依節氣交節時刻嚴格換月）</span>
+        </h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-center border-collapse">
+            <thead>
+              <tr class="border-b border-slate-700 text-slate-400 text-xs">
+                <th class="py-2 px-3 text-left w-24">項目</th>
+                <th class="py-2 px-3">年柱（根）</th>
+                <th class="py-2 px-3">月柱（苗）</th>
+                <th class="py-2 px-3 bg-amber-500/10 rounded-t-lg">日柱（花 / 本命）</th>
+                <th class="py-2 px-3">時柱（果）</th>
+              </tr>
+            </thead>
+            <tbody id="bazi-table-body" class="divide-y divide-slate-700/60 text-sm"></tbody>
+          </table>
+        </div>
+      </div>
+
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div class="bg-slate-800/90 border border-slate-700 rounded-2xl p-5 shadow-xl">
+          <h3 class="text-base font-bold text-amber-400 mb-3">八字五行能量分佈（含藏干權重）</h3>
+          <div id="bazi-wuxing-bars" class="space-y-3"></div>
+        </div>
+        <div class="lg:col-span-2 bg-slate-800/90 border border-slate-700 rounded-2xl p-5 shadow-xl">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-base font-bold text-amber-400">大運排盤（十年一運）</h3>
+            <span id="bazi-qiyun-info" class="text-xs text-slate-400"></span>
+          </div>
+          <div id="bazi-dayun-list" class="grid grid-cols-4 sm:grid-cols-8 gap-2"></div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ==================== 2. 紫微斗數面板 ==================== -->
+    <section id="panel-ziwei" class="hidden space-y-4">
+      <div class="bg-slate-800/90 border border-slate-700 rounded-2xl p-4 shadow-xl">
+        <div id="ziwei-board" class="zw-grid"></div>
+      </div>
+    </section>
+
+
+    <!-- ==================== 3. 西洋星盤面板（無捲軸一頁截圖優化版） ==================== -->
+    <section id="panel-astro" class="hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        <!-- 左側：SVG 西洋星盤圓盤 -->
+        <div class="lg:col-span-7 bg-slate-800/90 border border-slate-700 rounded-2xl p-5 shadow-xl flex flex-col items-center justify-center">
+          <div class="w-full flex justify-between items-center mb-1">
+            <h2 class="text-base font-bold text-sky-400">西洋本命星盤 (Natal Wheel)</h2>
+            <span class="text-xs text-slate-400">等宮制 (Equal House) / 黃道回歸制 (Tropical)</span>
+          </div>
+          <div id="astro-svg-container" class="w-full max-w-[540px] aspect-square flex items-center justify-center"></div>
+          <div class="flex flex-wrap gap-4 mt-2 text-xs text-slate-400">
+            <span class="flex items-center gap-1"><i class="w-3 h-0.5 bg-amber-400 inline-block"></i> 合相 (0°)</span>
+            <span class="flex items-center gap-1"><i class="w-3 h-0.5 bg-red-500 inline-block"></i> 對分相 (180°) / 四分相 (90°)</span>
+            <span class="flex items-center gap-1"><i class="w-3 h-0.5 bg-emerald-400 inline-block"></i> 三分相 (120°)</span>
+            <span class="flex items-center gap-1"><i class="w-3 h-0.5 bg-sky-400 inline-block"></i> 六分相 (60°)</span>
+          </div>
+        </div>
+
+
+        <!-- 右側：行星落點與「無捲軸」相位表 -->
+        <div class="lg:col-span-5 space-y-4">
+          <!-- 十大行星與軸點（雙欄緊湊排法，讓右側整體高度更精緻） -->
+          <div class="bg-slate-800/90 border border-slate-700 rounded-2xl p-4 shadow-xl">
+            <h3 class="text-sm font-bold text-sky-400 mb-2.5">十大行星與四角軸點落點</h3>
+            <div id="astro-planet-grid" class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs"></div>
+          </div>
+
+
+          <!-- 無捲軸相位區塊（支援三角矩陣 / 三欄緊湊切換） -->
+          <div class="bg-slate-800/90 border border-slate-700 rounded-2xl p-4 shadow-xl">
+            <div class="flex items-center justify-between mb-2.5">
+              <h3 class="text-sm font-bold text-sky-400">主要行星相位 (Aspects)</h3>
+              <div class="flex bg-slate-900 rounded-lg p-0.5 border border-slate-700 text-[11px]">
+                <button id="btn-asp-grid" onclick="setAspectView('grid')" class="px-2.5 py-0.5 rounded-md bg-sky-500 text-slate-950 font-bold transition">
+                  三角矩陣
+                </button>
+                <button id="btn-asp-chips" onclick="setAspectView('chips')" class="px-2.5 py-0.5 rounded-md text-slate-400 hover:text-white transition">
+                  三欄緊湊
+                </button>
+              </div>
+            </div>
+            <!-- 1. 傳統占星三角相位矩陣 (預設顯示，零捲軸、最省空間) -->
+            <div id="astro-aspect-grid" class="w-full overflow-x-auto"></div>
+            <!-- 2. 三欄式緊湊卡片 (備用視角，同樣無垂直捲軸) -->
+            <div id="astro-aspect-chips" class="hidden grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-xs"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+
+  <script>
+    const GANS = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
+    const ZHIS = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+    const GAN_WX = { '甲':'木','乙':'木','丙':'火','丁':'火','戊':'土','己':'土','庚':'金','辛':'金','壬':'水','癸':'水' };
+    const ZHI_WX = { '子':'水','丑':'土','寅':'木','卯':'木','辰':'土','巳':'火','午':'火','未':'土','申':'金','酉':'金','戌':'土','亥':'水' };
+
+
+    const NAYIN_30 = [
+      '海中金','爐中火','大林木','路旁土','劍鋒金','山頭火',
+      '澗下水','城頭土','白蠟金','楊柳木','泉中水','屋上土',
+      '霹靂火','松柏木','長流水','沙中金','山下火','平地木',
+      '壁上土','金箔金','覆燈火','天河水','大驛土','釵釧金',
+      '桑柘木','大溪水','沙中土','天上火','石榴木','大海水'
+    ];
+
+
+    function switchTab(tab) {
+      ['bazi', 'ziwei', 'astro'].forEach(t => {
+        document.getElementById(`panel-${t}`).classList.toggle('hidden', t !== tab);
+        const btn = document.getElementById(`tab-${t}`);
+        if (t === tab) {
+          btn.className = 'px-4 py-2 rounded-lg text-sm font-semibold bg-amber-500 text-slate-950 transition';
+        } else {
+          btn.className = 'px-4 py-2 rounded-lg text-sm font-semibold bg-slate-700 text-slate-200 hover:bg-slate-600 transition';
+        }
+      });
+    }
+
+
+    function setAspectView(mode) {
+      const isGrid = mode === 'grid';
+      document.getElementById('astro-aspect-grid').classList.toggle('hidden', !isGrid);
+      document.getElementById('astro-aspect-chips').classList.toggle('hidden', isGrid);
+      document.getElementById('btn-asp-grid').className = isGrid
+        ? 'px-2.5 py-0.5 rounded-md bg-sky-500 text-slate-950 font-bold transition'
+        : 'px-2.5 py-0.5 rounded-md text-slate-400 hover:text-white transition';
+      document.getElementById('btn-asp-chips').className = !isGrid
+        ? 'px-2.5 py-0.5 rounded-md bg-sky-500 text-slate-950 font-bold transition'
+        : 'px-2.5 py-0.5 rounded-md text-slate-400 hover:text-white transition';
+    }
+
+
+    function onCityChange() {
+      const val = document.getElementById('inp-city').value.split(',');
+      document.getElementById('inp-lat').value = val[0];
+      document.getElementById('inp-lng').value = val[1];
+      document.getElementById('inp-tz').value = val[2];
+      calculateAll();
+    }
+
+
+    function calculateAll() {
+      const dateStr = document.getElementById('inp-date').value;
+      const timeStr = document.getElementById('inp-time').value;
+      const gender = parseInt(document.getElementById('inp-gender').value, 10);
+      const lat = parseFloat(document.getElementById('inp-lat').value) || 25.03;
+      const lng = parseFloat(document.getElementById('inp-lng').value) || 121.56;
+      const tz = parseFloat(document.getElementById('inp-tz').value) || 8;
+
+
+      if (!dateStr || !timeStr) return;
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const [hour, minute] = timeStr.split(':').map(Number);
+
+
+      const solar = Solar.fromYmdHms(year, month, day, hour, minute, 0);
+      const lunar = solar.getLunar();
+      const bazi = lunar.getEightChar();
+      bazi.setSect(2);
+
+
+      const prevJie = lunar.getPrevJie();
+      const nextJie = lunar.getNextJie();
+      document.getElementById('summary-bar').innerHTML = `
+        <span><strong>西曆：</strong>${year}年${month}月${day}日 ${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}</span>
+        <span><strong>農曆：</strong>${lunar.getYearInGanZhi()}（${lunar.getYearShengXiao()}）年 ${lunar.getMonthInChinese()}月 ${lunar.getDayInChinese()} ${lunar.getTimeZhi()}時</span>
+        <span><strong>上一節：</strong>${prevJie.getName()} (${prevJie.getSolar().toYmdHms()})</span>
+        <span><strong>下一節：</strong>${nextJie.getName()} (${nextJie.getSolar().toYmdHms()})</span>
+      `;
+
+
+      renderBazi(solar, lunar, bazi, gender);
+      renderZiwei(solar, lunar, bazi, gender);
+      renderAstro(year, month, day, hour, minute, tz, lat, lng);
+    }
+
+
+    // ==================== 1. 八字排盤引擎 ====================
+    function renderBazi(solar, lunar, bazi, gender) {
+      const pillars = [
+        {
+          name: '年柱',
+          gan: bazi.getYearGan(),
+          zhi: bazi.getYearZhi(),
+          shishenGan: bazi.getYearShiShenGan(),
+          hideGan: bazi.getYearHideGan(),
+          shishenZhi: bazi.getYearShiShenZhi(),
+          dishi: bazi.getYearDiShi(),
+          xunkong: bazi.getYearXunKong(),
+          nayin: bazi.getYearNaYin()
+        },
+        {
+          name: '月柱',
+          gan: bazi.getMonthGan(),
+          zhi: bazi.getMonthZhi(),
+          shishenGan: bazi.getMonthShiShenGan(),
+          hideGan: bazi.getMonthHideGan(),
+          shishenZhi: bazi.getMonthShiShenZhi(),
+          dishi: bazi.getMonthDiShi(),
+          xunkong: bazi.getMonthXunKong(),
+          nayin: bazi.getMonthNaYin()
+        },
+        {
+          name: '日柱',
+          gan: bazi.getDayGan(),
+          zhi: bazi.getDayZhi(),
+          shishenGan: gender === 1 ? '元男（日主）' : '元女（日主）',
+          hideGan: bazi.getDayHideGan(),
+          shishenZhi: bazi.getDayShiShenZhi(),
+          dishi: bazi.getDayDiShi(),
+          xunkong: bazi.getDayXunKong(),
+          nayin: bazi.getDayNaYin()
+        },
+        {
+          name: '時柱',
+          gan: bazi.getTimeGan(),
+          zhi: bazi.getTimeZhi(),
+          shishenGan: bazi.getTimeShiShenGan(),
+          hideGan: bazi.getTimeHideGan(),
+          shishenZhi: bazi.getTimeShiShenZhi(),
+          dishi: bazi.getTimeDiShi(),
+          xunkong: bazi.getTimeXunKong(),
+          nayin: bazi.getTimeNaYin()
+        }
+      ];
+
+
+      const tbody = document.getElementById('bazi-table-body');
+      tbody.innerHTML = `
+        <tr>
+          <td class="py-2.5 px-3 text-left text-slate-400 font-medium">主星（十神）</td>
+          ${pillars.map((p, i) => `<td class="py-2.5 px-3 font-semibold ${i===2 ? 'text-amber-300 bg-amber-500/5' : 'text-slate-200'}">${p.shishenGan}</td>`).join('')}
+        </tr>
+        <tr>
+          <td class="py-3 px-3 text-left text-slate-400 font-medium">天干</td>
+          ${pillars.map((p, i) => {
+            const wx = GAN_WX[p.gan];
+            return `<td class="py-3 px-3 ${i===2 ? 'bg-amber-500/5' : ''}">
+              <div class="text-3xl font-extrabold wx-${wx}">${p.gan}</div>
+              <div class="text-[11px] text-slate-400 mt-0.5">${wx}</div>
+            </td>`;
+          }).join('')}
+        </tr>
+        <tr>
+          <td class="py-3 px-3 text-left text-slate-400 font-medium">地支</td>
+          ${pillars.map((p, i) => {
+            const wx = ZHI_WX[p.zhi];
+            return `<td class="py-3 px-3 ${i===2 ? 'bg-amber-500/5' : ''}">
+              <div class="text-3xl font-extrabold wx-${wx}">${p.zhi}</div>
+              <div class="text-[11px] text-slate-400 mt-0.5">${wx}</div>
+            </td>`;
+          }).join('')}
+        </tr>
+        <tr>
+          <td class="py-2.5 px-3 text-left text-slate-400 font-medium">藏干（副星）</td>
+          ${pillars.map((p, i) => `
+            <td class="py-2.5 px-3 ${i===2 ? 'bg-amber-500/5' : ''}">
+              <div class="space-y-1">
+                ${p.hideGan.map((hg, idx) => `
+                  <div class="text-xs">
+                    <span class="font-bold wx-${GAN_WX[hg]}">${hg}${GAN_WX[hg]}</span>
+                    <span class="text-slate-400">（${p.shishenZhi[idx]}）</span>
+                  </div>
+                `).join('')}
+              </div>
+            </td>
+          `).join('')}
+        </tr>
+        <tr>
+          <td class="py-2 px-3 text-left text-slate-400 font-medium">星運（十二長生）</td>
+          ${pillars.map((p, i) => `<td class="py-2 px-3 text-slate-200 ${i===2 ? 'bg-amber-500/5' : ''}">${p.dishi}</td>`).join('')}
+        </tr>
+        <tr>
+          <td class="py-2 px-3 text-left text-slate-400 font-medium">空亡</td>
+          ${pillars.map((p, i) => `<td class="py-2 px-3 text-slate-400 ${i===2 ? 'bg-amber-500/5' : ''}">${p.xunkong}</td>`).join('')}
+        </tr>
+        <tr>
+          <td class="py-2 px-3 text-left text-slate-400 font-medium">納音五行</td>
+          ${pillars.map((p, i) => `<td class="py-2 px-3 text-amber-200/90 ${i===2 ? 'bg-amber-500/5 rounded-b-lg' : ''}">${p.nayin}</td>`).join('')}
+        </tr>
+      `;
+
+
+      const wxScore = { '木': 0, '火': 0, '土': 0, '金': 0, '水': 0 };
+      pillars.forEach(p => {
+        wxScore[GAN_WX[p.gan]] += 1;
+        p.hideGan.forEach((hg, idx) => {
+          const weight = idx === 0 ? 1.0 : (idx === 1 ? 0.5 : 0.3);
+          wxScore[GAN_WX[hg]] += weight;
+        });
+      });
+      const totalScore = Object.values(wxScore).reduce((a, b) => a + b, 0);
+      const wxBars = document.getElementById('bazi-wuxing-bars');
+      wxBars.innerHTML = ['木','火','土','金','水'].map(wx => {
+        const pct = Math.round((wxScore[wx] / totalScore) * 100);
+        return `
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="font-bold wx-${wx}">${wx}</span>
+              <span class="text-slate-400">${wxScore[wx].toFixed(1)} 權重 (${pct}%)</span>
+            </div>
+            <div class="w-full h-2 bg-slate-900 rounded-full overflow-hidden">
+              <div class="h-full bg-wx-${wx}" style="width: ${pct}%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+
+      const yun = bazi.getYun(gender);
+      document.getElementById('bazi-qiyun-info').textContent =
+        `出生後 ${yun.getStartYear()} 年 ${yun.getStartMonth()} 個月 ${yun.getStartDay()} 天起運（西元 ${yun.getStartSolar().getYear()} 年）`;
+
+
+      const daYunArr = yun.getDaYun();
+      const dayunContainer = document.getElementById('bazi-dayun-list');
+      dayunContainer.innerHTML = daYunArr.slice(1, 9).map(dy => {
+        const gz = dy.getGanZhi();
+        const g = gz[0];
+        const z = gz[1];
+        return `
+          <div class="bg-slate-900/90 border border-slate-700/80 rounded-xl p-2.5 text-center">
+            <div class="text-[11px] text-slate-400">${dy.getStartAge()}歲</div>
+            <div class="text-[10px] text-slate-500 mb-1.5">${dy.getStartYear()}年</div>
+            <div class="text-lg font-bold wx-${GAN_WX[g]}">${g}</div>
+            <div class="text-lg font-bold wx-${ZHI_WX[z]}">${z}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+
+    // ==================== 2. 紫微斗數安星引擎 ====================
+    function renderZiwei(solar, lunar, bazi, gender) {
+      const lunarMonth = Math.abs(lunar.getMonth());
+      const lunarDay = lunar.getDay();
+      const timeZhi = lunar.getTimeZhi();
+      const timeIdx = ZHIS.indexOf(timeZhi);
+
+
+      const yearGan = lunar.getYearGan();
+      const yearZhi = lunar.getYearZhi();
+      const yearGanIdx = GANS.indexOf(yearGan);
+      const yearZhiIdx = ZHIS.indexOf(yearZhi);
+
+
+      const mingIdx = (2 + (lunarMonth - 1) - timeIdx + 12) % 12;
+      const shenIdx = (2 + (lunarMonth - 1) + timeIdx) % 12;
+
+
+      const PALACE_NAMES = ['命宮','兄弟','夫妻','子女','財帛','疾厄','遷移','交友','官祿','田宅','福德','父母'];
+      const palaces = Array.from({ length: 12 }, (_, zhiIdx) => ({
+        zhiIdx,
+        zhi: ZHIS[zhiIdx],
+        gan: '',
+        name: '',
+        isMing: zhiIdx === mingIdx,
+        isShen: zhiIdx === shenIdx,
+        majorStars: [],
+        minorStars: [],
+        daxian: ''
+      }));
+
+
+      for (let i = 0; i < 12; i++) {
+        const idx = (mingIdx - i + 12) % 12;
+        palaces[idx].name = PALACE_NAMES[i];
+      }
+
+
+      const yinGanIdx = ((yearGanIdx % 5) * 2 + 2) % 10;
+      for (let i = 0; i < 12; i++) {
+        const zhiIdx = (2 + i) % 12;
+        palaces[zhiIdx].gan = GANS[(yinGanIdx + i) % 10];
+      }
+
+
+      const mingGanIdx = GANS.indexOf(palaces[mingIdx].gan);
+      let jiaziIdx = 0;
+      for (let k = 0; k < 60; k++) {
+        if (k % 10 === mingGanIdx && k % 12 === mingIdx) {
+          jiaziIdx = k;
+          break;
+        }
+      }
+      const mingNaYin = NAYIN_30[Math.floor(jiaziIdx / 2)];
+      const nayinWx = mingNaYin.slice(-1);
+      const JU_MAP = {
+        '水': { name: '水二局', num: 2 },
+        '木': { name: '木三局', num: 3 },
+        '金': { name: '金四局', num: 4 },
+        '土': { name: '土五局', num: 5 },
+        '火': { name: '火六局', num: 6 }
+      };
+      const wuxingJu = JU_MAP[nayinWx];
+      const ju = wuxingJu.num;
+
+
+      const rem = lunarDay % ju;
+      const X = rem === 0 ? 0 : (ju - rem);
+      const q = (lunarDay + X) / ju;
+      const baseIdx = (2 + q - 1) % 12;
+      const ziweiIdx = X % 2 === 0 ? (baseIdx + X) % 12 : (baseIdx - X + 12) % 12;
+      const tianfuIdx = (4 - ziweiIdx + 12) % 12;
+
+
+      const ZIWEI_GROUP = [
+        { offset: 0, name: '紫微' },
+        { offset: -1, name: '天機' },
+        { offset: -3, name: '太陽' },
+        { offset: -4, name: '武曲' },
+        { offset: -5, name: '天同' },
+        { offset: -8, name: '廉貞' }
+      ];
+      ZIWEI_GROUP.forEach(s => {
+        const idx = (ziweiIdx + s.offset + 12) % 12;
+        palaces[idx].majorStars.push({ name: s.name, sihua: '' });
+      });
+
+
+      const TIANFU_GROUP = [
+        { offset: 0, name: '天府' },
+        { offset: 1, name: '太陰' },
+        { offset: 2, name: '貪狼' },
+        { offset: 3, name: '巨門' },
+        { offset: 4, name: '天相' },
+        { offset: 5, name: '天梁' },
+        { offset: 6, name: '七殺' },
+        { offset: 10, name: '破軍' }
+      ];
+      TIANFU_GROUP.forEach(s => {
+        const idx = (tianfuIdx + s.offset) % 12;
+        palaces[idx].majorStars.push({ name: s.name, sihua: '' });
+      });
+
+
+      const addMinor = (idx, name, type) => {
+        palaces[(idx + 12) % 12].minorStars.push({ name, type, sihua: '' });
+      };
+      addMinor(4 + (lunarMonth - 1), '左輔', 'ji');
+      addMinor(10 - (lunarMonth - 1), '右弼', 'ji');
+      addMinor(10 - timeIdx, '文昌', 'ji');
+      addMinor(4 + timeIdx, '文曲', 'ji');
+      addMinor(11 - timeIdx, '地空', 'sha');
+      addMinor(11 + timeIdx, '地劫', 'sha');
+
+
+      const LUCUN_POS = [2, 3, 5, 6, 5, 6, 8, 9, 11, 0];
+      const lucunIdx = LUCUN_POS[yearGanIdx];
+      addMinor(lucunIdx, '祿存', 'ji');
+      addMinor(lucunIdx + 1, '擎羊', 'sha');
+      addMinor(lucunIdx - 1, '陀羅', 'sha');
+
+
+      const KUI_POS = [1, 0, 11, 11, 1, 0, 1, 6, 3, 3];
+      const YUE_POS = [7, 8, 9, 9, 7, 8, 7, 2, 5, 5];
+      addMinor(KUI_POS[yearGanIdx], '天魁', 'ji');
+      addMinor(YUE_POS[yearGanIdx], '天鉞', 'ji');
+
+
+      const TIANMA_POS = [2, 11, 8, 5, 2, 11, 8, 5, 2, 11, 8, 5];
+      addMinor(TIANMA_POS[yearZhiIdx], '天馬', 'ji');
+
+
+      const SIHUA_TABLE = {
+        '甲': ['廉貞','破軍','武曲','太陽'],
+        '乙': ['天機','天梁','紫微','太陰'],
+        '丙': ['天同','天機','文昌','廉貞'],
+        '丁': ['太陰','天同','天機','巨門'],
+        '戊': ['貪狼','太陰','右弼','天機'],
+        '己': ['武曲','貪狼','天梁','文曲'],
+        '庚': ['太陽','武曲','太陰','天同'],
+        '辛': ['巨門','太陽','文曲','文昌'],
+        '壬': ['天梁','紫微','左輔','武曲'],
+        '癸': ['破軍','巨門','太陰','貪狼']
+      };
+      const SIHUA_LABELS = ['祿','權','科','忌'];
+      const currentSihua = SIHUA_TABLE[yearGan];
+      palaces.forEach(p => {
+        p.majorStars.forEach(s => {
+          const idx = currentSihua.indexOf(s.name);
+          if (idx !== -1) s.sihua = SIHUA_LABELS[idx];
+        });
+        p.minorStars.forEach(s => {
+          const idx = currentSihua.indexOf(s.name);
+          if (idx !== -1) s.sihua = SIHUA_LABELS[idx];
+        });
+      });
+
+
+      const isYangYear = yearGanIdx % 2 === 0;
+      const isClockwise = (gender === 1 && isYangYear) || (gender === 0 && !isYangYear);
+      for (let i = 0; i < 12; i++) {
+        const startAge = ju + i * 10;
+        const endAge = startAge + 9;
+        const targetIdx = isClockwise ? (mingIdx + i) % 12 : (mingIdx - i + 12) % 12;
+        palaces[targetIdx].daxian = `${startAge} - ${endAge}`;
+      }
+
+
+      const MINGZHU_MAP = ['貪狼','巨門','祿存','文曲','廉貞','武曲','破軍','武曲','廉貞','文曲','祿存','巨門'];
+      const SHENZHU_MAP = ['火星','天相','天梁','天同','文昌','天機','火星','天相','天梁','天同','文昌','天機'];
+      const mingZhu = MINGZHU_MAP[mingIdx];
+      const shenZhu = SHENZHU_MAP[yearZhiIdx];
+
+
+      const LAYOUT_ORDER = [
+        5, 6, 7, 8,
+        4, 'CENTER', 9,
+        3, 10,
+        2, 1, 0, 11
+      ];
+
+
+      const board = document.getElementById('ziwei-board');
+      board.innerHTML = LAYOUT_ORDER.map(cell => {
+        if (cell === 'CENTER') {
+          return `
+            <div class="zw-center bg-slate-900/95 border border-slate-700 rounded-xl p-5 flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+                  <span class="text-base font-bold text-amber-400">紫微斗數命盤（中宮）</span>
+                  <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300">
+                    ${isYangYear ? '陽' : '陰'}${gender === 1 ? '男' : '女'}・${wuxingJu.name}
+                  </span>
+                </div>
+                <div class="grid grid-cols-2 gap-y-2 text-xs text-slate-300">
+                  <div><span class="text-slate-500">農曆生辰：</span>${lunar.getYearInGanZhi()}年 ${lunar.getMonthInChinese()}月 ${lunar.getDayInChinese()} ${timeZhi}時</div>
+                  <div><span class="text-slate-500">四柱八字：</span>${bazi.getYear()} ${bazi.getMonth()} ${bazi.getDay()} ${bazi.getTime()}</div>
+                  <div><span class="text-slate-500">命宮坐落：</span>${ZHIS[mingIdx]}宮</div>
+                  <div><span class="text-slate-500">身宮坐落：</span>${ZHIS[shenIdx]}宮（寄${palaces[shenIdx].name}）</div>
+                  <div><span class="text-slate-500">命主星曜：</span><strong class="text-amber-300">${mingZhu}</strong></div>
+                  <div><span class="text-slate-500">身主星曜：</span><strong class="text-amber-300">${shenZhu}</strong></div>
+                </div>
+              </div>
+              <div class="border-t border-slate-800 pt-2 flex flex-wrap justify-between items-center text-[11px] text-slate-400">
+                <span>生年四化（${yearGan}干）：祿【${currentSihua[0]}】 權【${currentSihua[1]}】 科【${currentSihua[2]}】 忌【${currentSihua[3]}】</span>
+                <span>大限行運：${isClockwise ? '順行' : '逆行'}</span>
+              </div>
+            </div>
+          `;
+        }
+
+
+        const p = palaces[cell];
+        return `
+          <div class="bg-slate-900/80 border ${p.isMing ? 'border-amber-500/80 ring-1 ring-amber-500/30' : 'border-slate-700/80'} rounded-xl p-2.5 flex flex-col justify-between">
+            <div class="flex justify-between items-start gap-1">
+              <div class="flex flex-wrap gap-1.5">
+                ${p.majorStars.length > 0 ? p.majorStars.map(s => `
+                  <div class="flex flex-col items-center">
+                    <span class="text-sm font-extrabold text-rose-400 leading-tight" style="writing-mode: vertical-rl;">${s.name}</span>
+                    ${s.sihua ? `<span class="mt-1 px-1 rounded text-[10px] font-bold sihua-${s.sihua}">${s.sihua}</span>` : ''}
+                  </div>
+                `).join('') : '<span class="text-[11px] text-slate-600">（借對宮）</span>'}
+              </div>
+              <div class="flex flex-wrap justify-end gap-1 max-w-[60%]">
+                ${p.minorStars.map(s => `
+                  <div class="flex flex-col items-center">
+                    <span class="text-xs font-medium ${s.type === 'ji' ? 'text-sky-300' : 'text-purple-400'} leading-tight" style="writing-mode: vertical-rl;">${s.name}</span>
+                    ${s.sihua ? `<span class="mt-0.5 px-1 rounded text-[9px] font-bold sihua-${s.sihua}">${s.sihua}</span>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+
+            <div class="mt-3 pt-1.5 border-t border-slate-800 flex items-end justify-between text-xs">
+              <div>
+                <div class="text-[10px] text-slate-400 font-mono">${p.daxian}歲</div>
+                <div class="font-bold text-slate-300">${p.gan}${p.zhi}</div>
+              </div>
+              <div class="flex items-center gap-1">
+                ${p.isShen ? '<span class="px-1.5 py-0.5 text-[10px] rounded bg-indigo-500/30 text-indigo-300 border border-indigo-500/40">身</span>' : ''}
+                <span class="px-2 py-0.5 rounded font-bold ${p.isMing ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-amber-300'}">${p.name}</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+
+    // ==================== 3. 西洋星盤引擎（無捲軸一頁截圖版） ====================
+    const ZODIAC_SIGNS = [
+      { name: '牡羊', glyph: '♈', el: '火', color: '#f87171' },
+      { name: '金牛', glyph: '♉', el: '土', color: '#fbbf24' },
+      { name: '雙子', glyph: '♊', el: '風', color: '#38bdf8' },
+      { name: '巨蟹', glyph: '♋', el: '水', color: '#818cf8' },
+      { name: '獅子', glyph: '♌', el: '火', color: '#f87171' },
+      { name: '處女', glyph: '♍', el: '土', color: '#fbbf24' },
+      { name: '天秤', glyph: '♎', el: '風', color: '#38bdf8' },
+      { name: '天蠍', glyph: '♏', el: '水', color: '#818cf8' },
+      { name: '射手', glyph: '♐', el: '火', color: '#f87171' },
+      { name: '摩羯', glyph: '♑', el: '土', color: '#fbbf24' },
+      { name: '水瓶', glyph: '♒', el: '風', color: '#38bdf8' },
+      { name: '雙魚', glyph: '♓', el: '水', color: '#818cf8' }
+    ];
+
+
+    const PLANET_DEFS = [
+      { id: 'Sun', name: '太陽', glyph: '☉', color: '#fbbf24' },
+      { id: 'Moon', name: '月亮', glyph: '☽', color: '#e2e8f0' },
+      { id: 'Mercury', name: '水星', glyph: '☿', color: '#38bdf8' },
+      { id: 'Venus', name: '金星', glyph: '♀', color: '#f472b6' },
+      { id: 'Mars', name: '火星', glyph: '♂', color: '#ef4444' },
+      { id: 'Jupiter', name: '木星', glyph: '♃', color: '#c084fc' },
+      { id: 'Saturn', name: '土星', glyph: '♄', color: '#eab308' },
+      { id: 'Uranus', name: '天王', glyph: '♅', color: '#2dd4bf' },
+      { id: 'Neptune', name: '海王', glyph: '♆', color: '#60a5fa' },
+      { id: 'Pluto', name: '冥王', glyph: '♇', color: '#94a3b8' }
+    ];
+
+
+    function normDeg(d) {
+      return ((d % 360) + 360) % 360;
+    }
+
+
+    function formatSignDeg(lon) {
+      const norm = normDeg(lon);
+      const signIdx = Math.floor(norm / 30);
+      const degInSign = norm % 30;
+      const deg = Math.floor(degInSign);
+      const min = Math.round((degInSign - deg) * 60);
+      const sign = ZODIAC_SIGNS[signIdx];
+      return { sign, deg, min, text: `${sign.glyph}${sign.name} ${deg}°${String(min).padStart(2,'0')}'` };
+    }
+
+
+    function renderAstro(year, month, day, hour, minute, tz, lat, lng) {
+      const utcMs = Date.UTC(year, month - 1, day, hour, minute, 0) - tz * 3600 * 1000;
+      const utcDate = new Date(utcMs);
+
+
+      const planets = PLANET_DEFS.map(p => {
+        let lon = 0;
+        if (p.id === 'Sun') {
+          lon = Astronomy.SunPosition(utcDate).elon;
+        } else if (p.id === 'Moon') {
+          lon = Astronomy.EclipticGeoMoon(utcDate).lon;
+        } else {
+          const vec = Astronomy.GeoVector(p.id, utcDate, true);
+          lon = Astronomy.Ecliptic(vec).elon;
+        }
+        return { ...p, lon: normDeg(lon) };
+      });
+
+
+      const gmstHours = Astronomy.SiderealTime(utcDate);
+      const lstDeg = normDeg(gmstHours * 15 + lng);
+      const ramc = lstDeg * Math.PI / 180;
+      const eps = 23.4392911 * Math.PI / 180;
+      const phi = lat * Math.PI / 180;
+
+
+      const mcRad = Math.atan2(Math.sin(ramc), Math.cos(ramc) * Math.cos(eps));
+      const mcLon = normDeg(mcRad * 180 / Math.PI);
+
+
+      const ascRad = Math.atan2(Math.cos(ramc), -(Math.sin(ramc) * Math.cos(eps) + Math.tan(phi) * Math.sin(eps)));
+      const ascLon = normDeg(ascRad * 180 / Math.PI);
+
+
+      planets.forEach(p => {
+        p.house = Math.floor(normDeg(p.lon - ascLon) / 30) + 1;
+      });
+
+
+      // 雙欄緊湊行星列表（節省一半垂直高度）
+      const allPoints = [
+        ...planets,
+        { name: '上升', glyph: 'ASC', color: '#fbbf24', lon: ascLon, house: 1 },
+        { name: '天頂', glyph: 'MC', color: '#38bdf8', lon: mcLon, house: Math.floor(normDeg(mcLon - ascLon) / 30) + 1 }
+      ];
+
+
+      document.getElementById('astro-planet-grid').innerHTML = allPoints.map(p => {
+        const f = formatSignDeg(p.lon);
+        return `
+          <div class="flex items-center justify-between py-1 border-b border-slate-700/50">
+            <span class="font-semibold" style="color:${p.color}">${p.glyph} ${p.name}</span>
+            <span class="text-slate-200 font-mono text-[11px]">${f.text} <em class="not-italic text-slate-400">(${p.house}宮)</em></span>
+          </div>
+        `;
+      }).join('');
+
+
+      // 計算五大相位並建立三角矩陣索引
+      const ASPECT_DEFS = [
+        { name: '合相', glyph: '☌', angle: 0, orb: 8, color: '#fbbf24' },
+        { name: '對分', glyph: '☍', angle: 180, orb: 8, color: '#ef4444' },
+        { name: '三分', glyph: '△', angle: 120, orb: 7, color: '#34d399' },
+        { name: '四分', glyph: '□', angle: 90, orb: 7, color: '#f87171' },
+        { name: '六分', glyph: '⚹', angle: 60, orb: 5, color: '#38bdf8' }
+      ];
+
+
+      const aspects = [];
+      const aspectMap = {};
+      for (let i = 0; i < planets.length; i++) {
+        for (let j = i + 1; j < planets.length; j++) {
+          const p1 = planets[i];
+          const p2 = planets[j];
+          let diff = Math.abs(p1.lon - p2.lon);
+          if (diff > 180) diff = 360 - diff;
+
+
+          for (const asp of ASPECT_DEFS) {
+            const delta = Math.abs(diff - asp.angle);
+            if (delta <= asp.orb) {
+              const item = { p1, p2, asp, orb: delta };
+              aspects.push(item);
+              aspectMap[`${i}-${j}`] = item;
+              break;
+            }
+          }
+        }
+      }
+
+
+      // 1. 渲染三角相位矩陣 (Aspect Grid)
+      let gridHtml = `<table class="w-full border-collapse text-center select-none text-xs"><tbody>`;
+      for (let row = 0; row < planets.length; row++) {
+        gridHtml += `<tr>`;
+        for (let col = 0; col <= row; col++) {
+          if (col === row) {
+            const p = planets[row];
+            gridHtml += `
+              <td class="p-1 bg-slate-900/90 border border-slate-700 font-bold" style="color:${p.color}" title="${p.name}">
+                ${p.glyph}
+              </td>`;
+          } else {
+            const hit = aspectMap[`${col}-${row}`];
+            if (hit) {
+              gridHtml += `
+                <td class="p-0.5 bg-slate-900/40 border border-slate-700/70 leading-none" title="${hit.p1.name} ${hit.asp.name} ${hit.p2.name} (誤差 ${hit.orb.toFixed(1)}°)">
+                  <div class="font-bold text-xs" style="color:${hit.asp.color}">${hit.asp.glyph}</div>
+                  <div class="text-[9px] text-slate-400 font-mono">${hit.orb.toFixed(0)}°</div>
+                </td>`;
+            } else {
+              gridHtml += `<td class="p-1 bg-slate-900/20 border border-slate-800/60 text-slate-700">·</td>`;
+            }
+          }
+        }
+        gridHtml += `</tr>`;
+      }
+      gridHtml += `</tbody></table>`;
+      gridHtml += `
+        <div class="mt-2 flex flex-wrap justify-between text-[11px] text-slate-400 px-0.5">
+          <span><b class="text-amber-400">☌</b> 合(0°)</span>
+          <span><b class="text-red-500">☍</b> 對分(180°)</span>
+          <span><b class="text-emerald-400">△</b> 三分(120°)</span>
+          <span><b class="text-red-400">□</b> 四分(90°)</span>
+          <span><b class="text-sky-400">⚹</b> 六分(60°)</span>
+          <span class="text-slate-500">數字=誤差度數</span>
+        </div>
+      `;
+      document.getElementById('astro-aspect-grid').innerHTML = gridHtml;
+
+
+      // 2. 渲染三欄緊湊清單 (Compact Chips)
+      const sortedAspects = [...aspects].sort((a, b) => a.orb - b.orb);
+      document.getElementById('astro-aspect-chips').innerHTML = sortedAspects.map(a => `
+        <div class="bg-slate-900/80 border border-slate-700/70 rounded-lg px-2 py-1 flex items-center justify-between">
+          <div class="flex items-center gap-1">
+            <span style="color:${a.p1.color}">${a.p1.glyph}${a.p1.name[0]}</span>
+            <span class="font-bold" style="color:${a.asp.color}">${a.asp.glyph}</span>
+            <span style="color:${a.p2.color}">${a.p2.glyph}${a.p2.name[0]}</span>
+          </div>
+          <span class="text-[10px] text-slate-400 font-mono">${a.orb.toFixed(1)}°</span>
+        </div>
+      `).join('');
+
+
+      drawNatalWheelSVG(planets, ascLon, mcLon, aspects);
+    }
+
+
+    function drawNatalWheelSVG(planets, ascLon, mcLon, aspects) {
+      const size = 520;
+      const cx = size / 2;
+      const cy = size / 2;
+      const rOuter = 240;
+      const rSignInner = 195;
+      const rHouseInner = 115;
+
+
+      const lonToAngleRad = (lon) => {
+        const deg = 180 - (lon - ascLon);
+        return (deg * Math.PI) / 180;
+      };
+
+
+      const polarToXY = (r, lon) => {
+        const rad = lonToAngleRad(lon);
+        return {
+          x: cx + r * Math.cos(rad),
+          y: cy + r * Math.sin(rad)
+        };
+      };
+
+
+      let svg = `<svg viewBox="0 0 ${size} ${size}" class="w-full h-full select-none">`;
+      svg += `<circle cx="${cx}" cy="${cy}" r="${rOuter}" fill="#0f172a" stroke="#475569" stroke-width="2"/>`;
+      svg += `<circle cx="${cx}" cy="${cy}" r="${rSignInner}" fill="#1e293b" stroke="#475569" stroke-width="1.5"/>`;
+      svg += `<circle cx="${cx}" cy="${cy}" r="${rHouseInner}" fill="#0f172a" stroke="#334155" stroke-width="1"/>`;
+
+
+      for (let i = 0; i < 12; i++) {
+        const startLon = i * 30;
+        const midLon = startLon + 15;
+        const p1 = polarToXY(rSignInner, startLon);
+        const p2 = polarToXY(rOuter, startLon);
+        const pMid = polarToXY((rOuter + rSignInner) / 2, midLon);
+        const sign = ZODIAC_SIGNS[i];
+
+
+        svg += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="#475569" stroke-width="1"/>`;
+        svg += `<text x="${pMid.x}" y="${pMid.y}" fill="${sign.color}" font-size="18" font-weight="bold" text-anchor="middle" dominant-baseline="central">${sign.glyph}</text>`;
+      }
+
+
+      for (let i = 0; i < 12; i++) {
+        const cuspLon = normDeg(ascLon + i * 30);
+        const midLon = normDeg(cuspLon + 15);
+        const p1 = polarToXY(rHouseInner, cuspLon);
+        const p2 = polarToXY(rSignInner, cuspLon);
+        const pNum = polarToXY(rHouseInner + 16, midLon);
+        const isAngular = i % 3 === 0;
+
+
+        svg += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="${isAngular ? '#94a3b8' : '#334155'}" stroke-width="${isAngular ? '2' : '1'}"/>`;
+        svg += `<text x="${pNum.x}" y="${pNum.y}" fill="#64748b" font-size="10" text-anchor="middle" dominant-baseline="central">${i + 1}</text>`;
+      }
+
+
+      const ascP = polarToXY(rOuter + 14, ascLon);
+      const mcP = polarToXY(rOuter + 14, mcLon);
+      const mcInner = polarToXY(rHouseInner, mcLon);
+      const mcOuter = polarToXY(rSignInner, mcLon);
+      svg += `<line x1="${mcInner.x}" y1="${mcInner.y}" x2="${mcOuter.x}" y2="${mcOuter.y}" stroke="#38bdf8" stroke-width="2" stroke-dasharray="3,3"/>`;
+      svg += `<text x="${ascP.x}" y="${ascP.y}" fill="#fbbf24" font-size="11" font-weight="bold" text-anchor="middle" dominant-baseline="central">ASC</text>`;
+      svg += `<text x="${mcP.x}" y="${mcP.y}" fill="#38bdf8" font-size="11" font-weight="bold" text-anchor="middle" dominant-baseline="central">MC</text>`;
+
+
+      aspects.forEach(a => {
+        const pt1 = polarToXY(rHouseInner - 4, a.p1.lon);
+        const pt2 = polarToXY(rHouseInner - 4, a.p2.lon);
+        svg += `<line x1="${pt1.x}" y1="${pt1.y}" x2="${pt2.x}" y2="${pt2.y}" stroke="${a.asp.color}" stroke-width="1.2" stroke-opacity="0.75"/>`;
+      });
+
+
+      const sortedPlanets = [...planets].sort((a, b) => a.lon - b.lon);
+      sortedPlanets.forEach((p, idx) => {
+        if (idx > 0) {
+          let prev = sortedPlanets[idx - 1];
+          if (Math.abs(p.lon - prev.lon) < 5) {
+            p.displayLon = normDeg((prev.displayLon || prev.lon) + 5.5);
+          } else {
+            p.displayLon = p.lon;
+          }
+        } else {
+          p.displayLon = p.lon;
+        }
+      });
+
+
+      sortedPlanets.forEach(p => {
+        const truePt = polarToXY(rSignInner, p.lon);
+        const glyphPt = polarToXY(rSignInner - 28, p.displayLon);
+        svg += `<line x1="${truePt.x}" y1="${truePt.y}" x2="${glyphPt.x}" y2="${glyphPt.y}" stroke="${p.color}" stroke-width="0.8" stroke-opacity="0.6"/>`;
+        svg += `<circle cx="${truePt.x}" cy="${truePt.y}" r="2.5" fill="${p.color}"/>`;
+        svg += `<circle cx="${glyphPt.x}" cy="${glyphPt.y}" r="11" fill="#0f172a" stroke="${p.color}" stroke-width="1"/>`;
+        svg += `<text x="${glyphPt.x}" y="${glyphPt.y}" fill="${p.color}" font-size="13" font-weight="bold" text-anchor="middle" dominant-baseline="central">${p.glyph}</text>`;
+      });
+
+
+      svg += `</svg>`;
+      document.getElementById('astro-svg-container').innerHTML = svg;
+    }
+
+
+    window.addEventListener('DOMContentLoaded', calculateAll);
+  </script>
+</body>
+</html>
