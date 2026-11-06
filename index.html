@@ -61,7 +61,7 @@
             <span class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">已修復穩定版</span>
           </div>
           <p class="text-xs text-slate-400 mt-1">
-            真太陽時平移・地支刑沖神煞・紫微三方四正與大限四化・西洋逆行與元素三態・AI 解盤生成
+            真太陽時平移・地支刑沖神煞・五行500分制與喜用神推算・紫微三方四正與大限四化・西洋逆行與元素三態・AI 解盤生成
           </p>
         </div>
 
@@ -226,10 +226,21 @@
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <!-- 五行長條圖 -->
-        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl">
-          <h3 class="text-sm font-bold text-amber-400 mb-2.5">五行能量量化（含藏干權重）</h3>
-          <div id="bazi-wuxing-bars" class="space-y-2.5"></div>
+        <!-- 五行長條圖與日主強弱喜用神卡片 -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-2.5">
+              <h3 class="text-sm font-bold text-amber-400">五行能量與喜用神推算</h3>
+              <span class="text-[10px] text-slate-400 font-mono">總分 500 分制</span>
+            </div>
+            <!-- 日主強弱與喜用神標籤卡片 -->
+            <div id="bazi-strength-card" class="mb-3.5"></div>
+            <!-- 五行長條圖 -->
+            <div id="bazi-wuxing-bars" class="space-y-2.5"></div>
+          </div>
+          <div class="mt-3 pt-2 border-t border-slate-800/80 text-[10px] text-slate-500 leading-relaxed">
+            * 算法說明：藏干採標準矩陣（純氣1.0／二氣7:3／雜氣6:3:1），月令提綱加權 2.8 倍，天干虛浮無根者權重打 5 折。
+          </div>
         </div>
         <!-- 十年大運與點擊展開流年 -->
         <div class="lg:col-span-2 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl">
@@ -330,7 +341,7 @@
         <h3 class="text-base font-bold text-emerald-400">✨ 三合一 AI 深度解盤 Prompt</h3>
         <button type="button" onclick="closeAiPromptModal()" class="text-slate-400 hover:text-white text-lg font-bold">✕</button>
       </div>
-      <p class="text-xs text-slate-400">已自動彙整八字四柱、紫微三方四正與西洋本命相位，點擊下方按鈕即可複製並貼給 AI 進行深度推算：</p>
+      <p class="text-xs text-slate-400">已自動彙整八字四柱（含 500 分制五行與喜用神）、紫微三方四正與西洋本命相位，點擊下方按鈕即可複製並貼給 AI 進行深度推算：</p>
       <textarea id="ai-prompt-textarea" readonly class="w-full h-72 bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 font-mono focus:outline-none focus:border-emerald-500"></textarea>
       <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800">
         <span id="copy-status-msg" class="text-xs text-emerald-400 font-semibold"></span>
@@ -368,13 +379,23 @@
   </div>
 
   <script>
+    'use strict';
+
     /* ==============================================================
        1. 全域常量與輔助函式
        ============================================================== */
     const GANS = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
     const ZHIS = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+    const WX_LIST = ['木','火','土','金','水'];
     const GAN_WX = { '甲':'木','乙':'木','丙':'火','丁':'火','戊':'土','己':'土','庚':'金','辛':'金','壬':'水','癸':'水' };
     const ZHI_WX = { '子':'水','丑':'土','寅':'木','卯':'木','辰':'土','巳':'火','午':'火','未':'土','申':'金','酉':'金','戌':'土','亥':'水' };
+
+    // 地支藏干標準權重矩陣（純氣 1.0、二氣 0.7:0.3、雜氣 0.6:0.3:0.1）
+    const CANG_GAN_WEIGHT_MATRIX = {
+      1: [1.0],
+      2: [0.7, 0.3],
+      3: [0.6, 0.3, 0.1]
+    };
 
     const NAYIN_60 = [
       '海中金','海中金','爐中火','爐中火','大林木','大林木','路旁土','路旁土','劍鋒金','劍鋒金',
@@ -577,7 +598,7 @@
     }
 
     /* ==============================================================
-       4. 八字排盤引擎（四柱、神煞、刑沖會合、大運流年）
+       4. 八字排盤引擎（四柱、神煞、刑沖會合、五行500分制、日主強弱喜用神、大運流年）
        ============================================================== */
     function calcShenSha(yearGan, yearZhi, dayGan, dayZhi, targetZhi) {
       const res = [];
@@ -633,6 +654,7 @@
       const zhis = pillars.map(p => p.zhi);
       const names = ['年', '月', '日', '時'];
       const notes = [];
+      const plainNotes = [];
 
       // 天干五合
       const ganHePairs = [
@@ -643,6 +665,7 @@
           ganHePairs.forEach(pair => {
             if ((gans[i] === pair[0] && gans[j] === pair[1]) || (gans[i] === pair[1] && gans[j] === pair[0])) {
               notes.push(`<span class="text-amber-300 font-semibold">${names[i]}${names[j]}天干五合</span>（${gans[i]}${gans[j]}${pair[2]}）`);
+              plainNotes.push(`${names[i]}${names[j]}天干五合（${gans[i]}${gans[j]}${pair[2]}）`);
             }
           });
         }
@@ -660,20 +683,24 @@
           chongPairs.forEach(pair => {
             if ((pair[0] === z1 && pair[1] === z2) || (pair[1] === z1 && pair[0] === z2)) {
               notes.push(`<span class="text-rose-400 font-semibold">${names[i]}${names[j]}六沖</span>（${z1}${z2}相沖）`);
+              plainNotes.push(`${names[i]}${names[j]}六沖（${z1}${z2}相沖）`);
             }
           });
           hePairs.forEach(pair => {
             if ((pair[0] === z1 && pair[1] === z2) || (pair[1] === z1 && pair[0] === z2)) {
               notes.push(`<span class="text-emerald-400 font-semibold">${names[i]}${names[j]}六合</span>（${z1}${z2}相合）`);
+              plainNotes.push(`${names[i]}${names[j]}六合（${z1}${z2}相合）`);
             }
           });
           haiPairs.forEach(pair => {
             if ((pair[0] === z1 && pair[1] === z2) || (pair[1] === z1 && pair[0] === z2)) {
               notes.push(`<span class="text-orange-400 font-semibold">${names[i]}${names[j]}六害</span>（${z1}${z2}相害）`);
+              plainNotes.push(`${names[i]}${names[j]}六害（${z1}${z2}相害）`);
             }
           });
           if (z1 === z2 && ['辰','午','酉','亥'].includes(z1)) {
             notes.push(`<span class="text-purple-400 font-semibold">${names[i]}${names[j]}自刑</span>（${z1}${z2}自刑）`);
+            plainNotes.push(`${names[i]}${names[j]}自刑（${z1}${z2}自刑）`);
           }
         }
       }
@@ -689,12 +716,125 @@
         const hits = sh.zhis.filter(z => zhis.includes(z));
         if (hits.length === 3) {
           notes.push(`<span class="text-sky-300 font-bold">${sh.name}</span>`);
+          plainNotes.push(sh.name);
         } else if (hits.length === 2) {
           notes.push(`<span class="text-sky-400/90">地支半合（${hits.join('')}）</span>`);
+          plainNotes.push(`地支半合（${hits.join('')}）`);
         }
       });
 
-      return notes;
+      return { notes, plainNotes };
+    }
+
+    /**
+     * 五行能量算法重構（500分總分制、標準藏干矩陣、月令2.8倍提綱、天干通根修正）
+     * 並自動推算日主強弱（生扶同黨 vs 剋洩異黨）與喜用神/忌神
+     */
+    function calculateWuxingAndStrength(pillars, dayGan) {
+      const rawWxScore = { '木': 0, '火': 0, '土': 0, '金': 0, '水': 0 };
+
+      // 先收集四柱地支所有藏干的五行集合，用於判斷天干是否「通根」
+      const branchRootWxSet = new Set();
+      pillars.forEach(p => {
+        p.hideGan.forEach(hg => {
+          branchRootWxSet.add(GAN_WX[hg]);
+        });
+      });
+
+      // 計算天干與地支藏干原始能量
+      pillars.forEach((p, idx) => {
+        const ganWx = GAN_WX[p.gan];
+        // 天干通根修正：地支有同類藏干（有根）維持足額 1.0，虛浮無根者權重打 5 折 (0.5)
+        const hasRoot = branchRootWxSet.has(ganWx);
+        const ganWeight = hasRoot ? 1.0 : 0.5;
+        rawWxScore[ganWx] += ganWeight;
+        p.hasRoot = hasRoot;
+
+        // 地支藏干權重矩陣（純氣 1.0、二氣 0.7:0.3、雜氣 0.6:0.3:0.1）
+        // 月令（idx === 1）加入 2.8 倍提綱氣候權重
+        const monthMult = (idx === 1) ? 2.8 : 1.0;
+        const weights = CANG_GAN_WEIGHT_MATRIX[p.hideGan.length] || [0.6, 0.3, 0.1];
+        p.hideGan.forEach((hg, hIdx) => {
+          const w = weights[hIdx] !== undefined ? weights[hIdx] : 0.1;
+          rawWxScore[GAN_WX[hg]] += w * monthMult;
+        });
+      });
+
+      // 正規化為 500 分總分制
+      const rawTotal = Object.values(rawWxScore).reduce((a, b) => a + b, 0) || 1;
+      const wxScore = {};
+      const wxPct = {};
+      WX_LIST.forEach(wx => {
+        wxScore[wx] = (rawWxScore[wx] / rawTotal) * 500;
+        wxPct[wx] = Math.round((rawWxScore[wx] / rawTotal) * 100);
+      });
+
+      // 日主十神五行關係定位
+      const dayWx = GAN_WX[dayGan];
+      const dIdx = WX_LIST.indexOf(dayWx);
+      const bijieWx = WX_LIST[dIdx];             // 比劫（同我）
+      const shishangWx = WX_LIST[(dIdx + 1) % 5]; // 食傷（我生）
+      const caixingWx = WX_LIST[(dIdx + 2) % 5];  // 財星（我剋）
+      const guanshaWx = WX_LIST[(dIdx + 3) % 5];  // 官殺（剋我）
+      const yinxingWx = WX_LIST[(dIdx + 4) % 5];  // 印星（生我）
+
+      // 生扶同黨（印星＋比劫） vs 剋洩異黨（食傷＋財星＋官殺）
+      const samePartyScore = wxScore[bijieWx] + wxScore[yinxingWx];
+      const diffPartyScore = wxScore[shishangWx] + wxScore[caixingWx] + wxScore[guanshaWx];
+      const samePartyPct = Math.round((samePartyScore / 500) * 100);
+      const diffPartyPct = 100 - samePartyPct;
+
+      let status = '中和';
+      let badgeClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+      let xiYong = [];
+      let jiShen = [];
+      let desc = '';
+
+      if (samePartyScore >= 275) {
+        status = '身強';
+        badgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+        xiYong = [shishangWx, caixingWx, guanshaWx];
+        jiShen = [yinxingWx, bijieWx];
+        desc = `同黨生扶能量充沛（${samePartyPct}%），宜取食傷洩秀、財星耗身或官殺制衡為用。`;
+      } else if (samePartyScore <= 225) {
+        status = '身弱';
+        badgeClass = 'bg-sky-500/20 text-sky-300 border-sky-500/40';
+        xiYong = [yinxingWx, bijieWx];
+        jiShen = [guanshaWx, caixingWx, shishangWx];
+        desc = `異黨剋洩能量較重（${diffPartyPct}%），宜取印星生身、比劫助威以扶助日主元神。`;
+      } else {
+        status = '中和';
+        badgeClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+        if (samePartyScore >= 250) {
+          xiYong = [shishangWx, caixingWx, guanshaWx];
+          jiShen = [yinxingWx, bijieWx];
+          desc = `生扶與剋洩趨於平衡（同黨略旺 ${samePartyPct}%），命局中和偏強，順勢疏導食財官最吉。`;
+        } else {
+          xiYong = [yinxingWx, bijieWx];
+          jiShen = [guanshaWx, caixingWx, shishangWx];
+          desc = `生扶與剋洩趨於平衡（異黨略旺 ${diffPartyPct}%），命局中和偏弱，大運逢印比生扶最吉。`;
+        }
+      }
+
+      const strengthInfo = {
+        dayWx,
+        bijieWx,
+        yinxingWx,
+        shishangWx,
+        caixingWx,
+        guanshaWx,
+        samePartyScore,
+        diffPartyScore,
+        samePartyPct,
+        diffPartyPct,
+        status,
+        badgeClass,
+        xiYong,
+        jiShen,
+        desc
+      };
+
+      return { wxScore, wxPct, strengthInfo };
     }
 
     function renderBazi(solar, lunar, bazi, gender) {
@@ -758,8 +898,21 @@
         }
       ];
 
-      const interactions = analyzeZhiInteractions(pillars);
-      currentCalcState.bazi = { pillars, bazi, gender, solar, lunar, interactions };
+      const { notes: interactions, plainNotes: interactionsPlain } = analyzeZhiInteractions(pillars);
+      const { wxScore, wxPct, strengthInfo } = calculateWuxingAndStrength(pillars, dayGan);
+
+      currentCalcState.bazi = {
+        pillars,
+        bazi,
+        gender,
+        solar,
+        lunar,
+        interactions,
+        interactionsPlain,
+        wxScore,
+        wxPct,
+        strengthInfo
+      };
 
       const tbody = document.getElementById('bazi-table-body');
       tbody.innerHTML = `
@@ -773,7 +926,10 @@
             const wx = GAN_WX[p.gan];
             return `<td class="py-3 px-3 ${i===2 ? 'bg-amber-500/10' : ''}">
               <div class="text-3xl font-black wx-${wx}">${p.gan}</div>
-              <div class="text-[11px] text-slate-400 mt-0.5">${wx}</div>
+              <div class="text-[11px] text-slate-400 mt-0.5">
+                ${wx}
+                <span class="text-[10px] ${p.hasRoot ? 'text-emerald-400/80' : 'text-slate-500'}">(${p.hasRoot ? '通根' : '虛浮'})</span>
+              </div>
             </td>`;
           }).join('')}
         </tr>
@@ -783,7 +939,7 @@
             const wx = ZHI_WX[p.zhi];
             return `<td class="py-3 px-3 ${i===2 ? 'bg-amber-500/10' : ''}">
               <div class="text-3xl font-black wx-${wx}">${p.zhi}</div>
-              <div class="text-[11px] text-slate-400 mt-0.5">${wx}</div>
+              <div class="text-[11px] text-slate-400 mt-0.5">${wx}${i===1 ? ' <span class="text-amber-400/90 text-[10px]">(月令×2.8)</span>' : ''}</div>
             </td>`;
           }).join('')}
         </tr>
@@ -841,28 +997,64 @@
         `;
       }
 
-      const wxScore = { '木': 0, '火': 0, '土': 0, '金': 0, '水': 0 };
-      pillars.forEach((p, idx) => {
-        wxScore[GAN_WX[p.gan]] += 1.0;
-        const monthMult = (idx === 1) ? 1.5 : 1.0; // 月令提綱加權
-        p.hideGan.forEach((hg, hIdx) => {
-          const w = hIdx === 0 ? 1.0 : (hIdx === 1 ? 0.5 : 0.3);
-          wxScore[GAN_WX[hg]] += w * monthMult;
-        });
-      });
-      const totalScore = Object.values(wxScore).reduce((a, b) => a + b, 0);
-      currentCalcState.bazi.wxScore = wxScore;
+      // 渲染日主強弱與喜用神標籤卡片
+      document.getElementById('bazi-strength-card').innerHTML = `
+        <div class="bg-slate-950/90 border border-slate-800 rounded-xl p-3 space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="text-xs text-slate-300 flex items-center gap-1.5">
+              <span>日主元神：</span>
+              <strong class="wx-${strengthInfo.dayWx} text-sm">${dayGan}${strengthInfo.dayWx}</strong>
+            </div>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold border ${strengthInfo.badgeClass}">
+              判定：${strengthInfo.status}
+            </span>
+          </div>
 
-      document.getElementById('bazi-wuxing-bars').innerHTML = ['木','火','土','金','水'].map(wx => {
-        const pct = Math.round((wxScore[wx] / totalScore) * 100);
+          <div class="space-y-1">
+            <div class="flex justify-between text-[11px] font-mono">
+              <span class="text-emerald-400">生扶同黨 (印比)：${strengthInfo.samePartyScore.toFixed(1)}分 (${strengthInfo.samePartyPct}%)</span>
+              <span class="text-rose-400">剋洩異黨 (食財官)：${strengthInfo.diffPartyScore.toFixed(1)}分 (${strengthInfo.diffPartyPct}%)</span>
+            </div>
+            <div class="w-full h-2 bg-slate-900 rounded-full overflow-hidden flex border border-slate-800">
+              <div class="h-full bg-emerald-500" style="width: ${strengthInfo.samePartyPct}%"></div>
+              <div class="h-full bg-rose-500" style="width: ${strengthInfo.diffPartyPct}%"></div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 pt-1 text-xs">
+            <div class="bg-slate-900/90 border border-slate-800/90 rounded-lg px-2.5 py-1.5">
+              <div class="text-[10px] text-slate-400">推薦喜用五行</div>
+              <div class="font-bold mt-0.5 flex flex-wrap gap-1.5">
+                ${strengthInfo.xiYong.map(wx => `<span class="wx-${wx}">${wx}</span>`).join('・')}
+              </div>
+            </div>
+            <div class="bg-slate-900/90 border border-slate-800/90 rounded-lg px-2.5 py-1.5">
+              <div class="text-[10px] text-slate-400">次要忌神五行</div>
+              <div class="font-bold mt-0.5 flex flex-wrap gap-1.5">
+                ${strengthInfo.jiShen.map(wx => `<span class="wx-${wx}">${wx}</span>`).join('・')}
+              </div>
+            </div>
+          </div>
+          <div class="text-[11px] text-slate-400 leading-snug">${strengthInfo.desc}</div>
+        </div>
+      `;
+
+      // 渲染五行長條圖（實數分數與百分比%雙顯示）
+      document.getElementById('bazi-wuxing-bars').innerHTML = WX_LIST.map(wx => {
+        const scoreVal = wxScore[wx].toFixed(1);
+        const pct = wxPct[wx];
+        const isXi = strengthInfo.xiYong.includes(wx);
         return `
           <div>
-            <div class="flex justify-between text-xs mb-1">
-              <span class="font-bold wx-${wx}">${wx} (${wxScore[wx].toFixed(1)})</span>
-              <span class="text-slate-400">${pct}%</span>
+            <div class="flex justify-between items-center text-xs mb-1">
+              <span class="font-bold wx-${wx} flex items-center gap-1.5">
+                <span>${wx}：${scoreVal} 分 (${pct}%)</span>
+                ${isXi ? '<span class="px-1 py-0.2 rounded text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">喜用</span>' : ''}
+              </span>
+              <span class="text-slate-400 font-mono text-[11px]">${scoreVal} / 500</span>
             </div>
             <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
-              <div class="h-full bg-wx-${wx}" style="width: ${pct}%"></div>
+              <div class="h-full bg-wx-${wx}" style="width: ${Math.min(100, Math.max(2, pct))}%"></div>
             </div>
           </div>
         `;
@@ -1125,7 +1317,7 @@
     }
 
     function renderZiweiBoard() {
-      const { palaces, mingIdx, shenIdx, wuxingJu, yearGan, isYangYear, isClockwise, gender, mingZhu, shenZhu, zwLunar } = currentCalcState.ziwei;
+      const { palaces, mingIdx, shenIdx, wuxingJu, isYangYear, isClockwise, gender, mingZhu, shenZhu, zwLunar } = currentCalcState.ziwei;
       const selDaxianIdx = parseInt(document.getElementById('inp-zw-daxian-sel').value, 10);
       let dxSihuaMap = {};
       if (selDaxianIdx >= 0 && palaces[selDaxianIdx]) {
@@ -1228,9 +1420,13 @@
       renderZiweiBoard();
     }
 
+    // 已修復：明確宣告區域變數 selDaxianIdx，避免運算子優先級錯誤與全域變數洩漏，並在切回原局時重置回命宮
     function onZwDaxianChange() {
-      if ( selDaxianIdx = parseInt(document.getElementById('inp-zw-daxian-sel').value, 10) >= 0) {
-        selectedPalaceIdx = parseInt(document.getElementById('inp-zw-daxian-sel').value, 10);
+      const selDaxianIdx = parseInt(document.getElementById('inp-zw-daxian-sel').value, 10);
+      if (selDaxianIdx >= 0) {
+        selectedPalaceIdx = selDaxianIdx;
+      } else if (currentCalcState.ziwei) {
+        selectedPalaceIdx = currentCalcState.ziwei.mingIdx;
       }
       renderZiweiBoard();
     }
@@ -1484,7 +1680,10 @@
       sortedPlanets.forEach((p, idx) => {
         if (idx > 0) {
           const prev = sortedPlanets[idx - 1];
-          p.displayLon = (Math.abs(p.lon - prev.lon) < 5) ? normDeg((prev.displayLon || prev.lon) + 5.5) : p.lon;
+          const prevDisplay = prev.displayLon !== undefined ? prev.displayLon : prev.lon;
+          let diff = p.lon - prevDisplay;
+          if (diff < -180) diff += 360;
+          p.displayLon = (diff < 5.5) ? normDeg(prevDisplay + 5.5) : p.lon;
         } else {
           p.displayLon = p.lon;
         }
@@ -1541,6 +1740,7 @@
       const dayGan = bazi.pillars[2].gan;
       const dayZhi = bazi.pillars[2].zhi;
       const dayWx = GAN_WX[dayGan];
+      const st = bazi.strengthInfo;
 
       const mingPalace = ziwei.palaces[ziwei.mingIdx];
       const mingStars = mingPalace.majorStars.map(s => s.name).join('、') || '命無正曜（借對宮）';
@@ -1553,10 +1753,13 @@
 
       document.getElementById('cross-system-cards').innerHTML = `
         <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
-          <div class="text-xs text-amber-400 font-bold mb-1">四柱八字核心（日主元神）</div>
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs text-amber-400 font-bold">四柱八字核心（日主元神）</span>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${st.badgeClass}">${st.status}</span>
+          </div>
           <div class="text-2xl font-black wx-${dayWx}">${dayGan}${dayZhi} <span class="text-sm font-normal text-slate-400">(${dayWx}命)</span></div>
           <div class="text-xs text-slate-400 mt-2">
-            月令提綱：<strong class="text-slate-200">${bazi.pillars[1].gan}${bazi.pillars[1].zhi}</strong>｜納音：${bazi.pillars[2].nayin}
+            月令提綱：<strong class="text-slate-200">${bazi.pillars[1].gan}${bazi.pillars[1].zhi}</strong>｜喜用：<strong class="text-emerald-300">${st.xiYong.join('、')}</strong>
           </div>
         </div>
         <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
@@ -1578,7 +1781,7 @@
 
       const strongestWx = getStrongestWx(bazi.wxScore);
       document.getElementById('summary-bazi-analysis').innerHTML = `
-        <p>• <strong>八字命局：</strong>日主為 <strong class="wx-${dayWx}">${dayGan}${dayWx}</strong>，生於 <strong>${bazi.pillars[1].zhi}</strong> 月，全局五行能量以 <strong class="wx-${strongestWx}">${strongestWx}</strong> 最旺，坐支十二長生處於【<strong>${bazi.pillars[2].dishi}</strong>】。</p>
+        <p>• <strong>八字命局：</strong>日主為 <strong class="wx-${dayWx}">${dayGan}${dayWx}</strong>，生於 <strong>${bazi.pillars[1].zhi}</strong> 月，全局五行能量以 <strong class="wx-${strongestWx}">${strongestWx} (${bazi.wxScore[strongestWx].toFixed(1)}分 / ${bazi.wxPct[strongestWx]}%)</strong> 最旺；日主判定為【<strong>${st.status}</strong>】（同黨 ${st.samePartyPct}%：異黨 ${st.diffPartyPct}%），推薦喜用五行為【<strong class="text-emerald-300">${st.xiYong.join('、')}</strong>】，忌神五行為【<strong class="text-rose-300">${st.jiShen.join('、')}</strong>】。</p>
         <p>• <strong>紫微三方：</strong>命宮坐 <strong>${mingPalace.zhi}</strong>（${mingStars}），財帛宮主星為【${ziwei.palaces[mod12(ziwei.mingIdx + 8)].majorStars.map(s=>s.name).join('、') || '無主星'}】，官祿宮主星為【${ziwei.palaces[mod12(ziwei.mingIdx + 4)].majorStars.map(s=>s.name).join('、') || '無主星'}】。</p>
       `;
 
@@ -1598,6 +1801,7 @@
       const { params, bazi, ziwei, astro } = currentCalcState;
       if (!params || !bazi) return '';
 
+      const st = bazi.strengthInfo;
       const sun = astro.planets.find(p => p.id === 'Sun');
       const moon = astro.planets.find(p => p.id === 'Moon');
       const ascSign = formatSignDeg(astro.ascLon).sign;
@@ -1608,6 +1812,8 @@
       const qianPalace = ziwei.palaces[mod12(ziwei.mingIdx + 6)];
       const fuqiPalace = ziwei.palaces[mod12(ziwei.mingIdx - 2)];
 
+      const wxSummaryStr = WX_LIST.map(wx => `${wx}：${bazi.wxScore[wx].toFixed(1)}分 (${bazi.wxPct[wx]}%)`).join('、');
+
       return `你是一位精通東方傳統命理（四柱八字、紫微斗數）與現代西洋占星學的資深命理導師。請根據以下精確排盤數據，為案主進行一次深入、客觀且融會貫通的人生綜合解讀：
 
 ### 【案主基本資料】
@@ -1617,11 +1823,14 @@
 - 真太陽時校正：西元 ${params.adjY}年${params.adjM}月${params.adjD}日 ${String(params.adjH).padStart(2,'0')}:${String(params.adjMin).padStart(2,'0')}
 
 ### 【一、四柱八字命盤】
-- 年柱：${bazi.pillars[0].gan}${bazi.pillars[0].zhi}（十神：${bazi.pillars[0].shishenGan}，藏干：${bazi.pillars[0].hideGan.join('')}，神煞：${bazi.pillars[0].shensha.join('、') || '無'}）
-- 月柱：${bazi.pillars[1].gan}${bazi.pillars[1].zhi}（十神：${bazi.pillars[1].shishenGan}，藏干：${bazi.pillars[1].hideGan.join('')}，神煞：${bazi.pillars[1].shensha.join('、') || '無'}）
-- 日柱：${bazi.pillars[2].gan}${bazi.pillars[2].zhi}（日主元神：${bazi.pillars[2].gan}${GAN_WX[bazi.pillars[2].gan]}，藏干：${bazi.pillars[2].hideGan.join('')}，十二長生：${bazi.pillars[2].dishi}，神煞：${bazi.pillars[2].shensha.join('、') || '無'}）
-- 時柱：${bazi.pillars[3].gan}${bazi.pillars[3].zhi}（十神：${bazi.pillars[3].shishenGan}，藏干：${bazi.pillars[3].hideGan.join('')}，神煞：${bazi.pillars[3].shensha.join('、') || '無'}）
-- 五行能量加權：木(${bazi.wxScore['木'].toFixed(1)})、火(${bazi.wxScore['火'].toFixed(1)})、土(${bazi.wxScore['土'].toFixed(1)})、金(${bazi.wxScore['金'].toFixed(1)})、水(${bazi.wxScore['水'].toFixed(1)})
+- 年柱：${bazi.pillars[0].gan}${bazi.pillars[0].zhi}（十神：${bazi.pillars[0].shishenGan}，天干${bazi.pillars[0].hasRoot ? '通根' : '虛浮'}，藏干：${bazi.pillars[0].hideGan.join('')}，神煞：${bazi.pillars[0].shensha.join('、') || '無'}）
+- 月柱：${bazi.pillars[1].gan}${bazi.pillars[1].zhi}（十神：${bazi.pillars[1].shishenGan}，天干${bazi.pillars[1].hasRoot ? '通根' : '虛浮'}，藏干：${bazi.pillars[1].hideGan.join('')}，神煞：${bazi.pillars[1].shensha.join('、') || '無'}）
+- 日柱：${bazi.pillars[2].gan}${bazi.pillars[2].zhi}（日主元神：${bazi.pillars[2].gan}${GAN_WX[bazi.pillars[2].gan]}，天干${bazi.pillars[2].hasRoot ? '通根' : '虛浮'}，藏干：${bazi.pillars[2].hideGan.join('')}，十二長生：${bazi.pillars[2].dishi}，神煞：${bazi.pillars[2].shensha.join('、') || '無'}）
+- 時柱：${bazi.pillars[3].gan}${bazi.pillars[3].zhi}（十神：${bazi.pillars[3].shishenGan}，天干${bazi.pillars[3].hasRoot ? '通根' : '虛浮'}，藏干：${bazi.pillars[3].hideGan.join('')}，神煞：${bazi.pillars[3].shensha.join('、') || '無'}）
+- 干支刑沖合害：${bazi.interactionsPlain.length > 0 ? bazi.interactionsPlain.join('、') : '四柱干支平和，無明顯沖合'}
+- 五行能量量化（500分總分制，含月令2.8倍提綱與通根修正）：${wxSummaryStr}
+- 日主強弱判定：【${st.status}】｜生扶同黨（印比）：${st.samePartyScore.toFixed(1)}分 (${st.samePartyPct}%) vs 剋洩異黨（食財官）：${st.diffPartyScore.toFixed(1)}分 (${st.diffPartyPct}%)
+- 喜用神與忌神結論：推薦喜用五行【${st.xiYong.join('、')}】｜忌神五行【${st.jiShen.join('、')}】（${st.desc}）
 - 大運走勢：${bazi.daYunArr.slice(1, 9).map(d => `${d.getStartAge()}歲[${d.getGanZhi()}]`).join(' → ')}
 
 ### 【二、紫微斗數命盤】
@@ -1642,10 +1851,10 @@ ${astro.aspects.slice(0, 8).map(a => `  * ${a.p1.name} ${a.asp.name} ${a.p2.name
 
 ---
 ### 【請針對以下四個維度進行深度交叉剖析】
-1. **核心性格、天賦與潛意識矛盾**：結合「八字日主與月令」、「紫微命身宮星曜」與「西洋日月升三巨頭」，交叉比對案主的外在表現與內在真實需求。
-2. **事業格局、財富管道與職場建議**：綜合八字喜用神、紫微三方四正（命財官遷）與西洋第 2、6、10 宮配置，指出最適合的產業屬性與求財策略（上班創業、合夥或獨立專業）。
+1. **核心性格、天賦與潛意識矛盾**：結合「八字日主強弱（${st.status}）與月令提綱」、「紫微命身宮星曜」與「西洋日月升三巨頭」，交叉比對案主的外在表現與內在真實需求。
+2. **事業格局、財富管道與職場建議**：綜合八字喜用神（喜用：${st.xiYong.join('、')}／忌神：${st.jiShen.join('、')}）、紫微三方四正（命財官遷）與西洋第 2、6、10 宮配置，指出最適合的產業屬性與求財策略（上班創業、合夥或獨立專業）。
 3. **感情婚姻與人際關係模式**：從八字日支（配偶宮）、紫微夫妻宮與西洋金星/月亮/第7宮，剖析感情互動盲點與正緣特質。
-4. **當前與未來十年大運/大限關鍵提醒**：針對案主目前所處年齡階段的大運與大限，給出具體可執行的生活、健康與決策建議。`;
+4. **當前與未來十年大運/大限關鍵提醒**：針對案主目前所處年齡階段的大運與大限，結合喜忌五行給出具體可執行的生活、健康與決策建議。`;
     }
 
     function openAiPromptModal() {
@@ -1818,3 +2027,4 @@ ${astro.aspects.slice(0, 8).map(a => `  * ${a.p1.name} ${a.asp.name} ${a.p2.name
   </script>
 </body>
 </html>
+
